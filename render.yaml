@@ -1,0 +1,16 @@
+services:
+  - type: web
+    runtime: node
+    name: stremio-dual-subs
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: OPENSUBTITLES_API_KEY
+        sync: false
+      - key: OPENSUBTITLES_USERNAME
+        sync: false
+      - key: OPENSUBTITLES_PASSWORD
+        sync: false
+      - key: PORT
+        value: "7000"
