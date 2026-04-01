@@ -21,6 +21,12 @@ export const manifest = {
   },
   config: [
     {
+      key: 'apiKey',
+      type: 'text',
+      title: 'OpenSubtitles API Key (get one free at opensubtitles.com → My Profile → API Access)',
+      required: true,
+    },
+    {
       key: 'lang1',
       type: 'select',
       title: 'Primary Language (top)',

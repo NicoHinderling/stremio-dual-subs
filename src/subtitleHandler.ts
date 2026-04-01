@@ -19,7 +19,7 @@ function buildResponse(baseUrl: string, key: string, lang1: string, lang2: strin
 async function fetchSrt(lang: string, opts: SearchOpts): Promise<string> {
   const result = await searchSubtitles(lang, opts);
   if (!result) throw new Error(`No subtitle found for lang=${lang}`);
-  return downloadSrt(result.fileId);
+  return downloadSrt(result.fileId, opts.apiKey);
 }
 
 export function registerSubtitleHandler(
@@ -27,8 +27,14 @@ export function registerSubtitleHandler(
   baseUrl: string,
 ): void {
   builder.defineSubtitlesHandler(async ({ type, id, extra, config }: SubtitleHandlerArgs) => {
-    const lang1: string = (config as Record<string, string>)?.lang1 ?? 'en';
-    const lang2: string = (config as Record<string, string>)?.lang2 ?? 'en';
+    const apiKey: string = config?.apiKey ?? '';
+    const lang1: string = config?.lang1 ?? 'en';
+    const lang2: string = config?.lang2 ?? 'en';
+
+    if (!apiKey) {
+      console.warn('No OpenSubtitles API key in config');
+      return { subtitles: [] };
+    }
 
     // Series IDs: "tt1234567:1:3" (IMDb + season + episode)
     const [imdbId, seasonStr, episodeStr] = id.split(':');
@@ -45,7 +51,7 @@ export function registerSubtitleHandler(
       return buildResponse(baseUrl, key, lang1, lang2);
     }
 
-    const opts: SearchOpts = { hash, imdbId: numericImdb, type: osType, season, episode };
+    const opts: SearchOpts = { apiKey, hash, imdbId: numericImdb, type: osType, season, episode };
 
     const [res1, res2] = await Promise.allSettled([
       fetchSrt(lang1, opts),

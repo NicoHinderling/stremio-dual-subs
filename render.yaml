@@ -6,11 +6,7 @@ services:
     startCommand: npm start
     healthCheckPath: /health
     envVars:
-      - key: OPENSUBTITLES_API_KEY
-        sync: false
-      - key: OPENSUBTITLES_USERNAME
-        sync: false
-      - key: OPENSUBTITLES_PASSWORD
-        sync: false
       - key: PORT
-        value: "7000"
+        value: "7001"
+      # No API key needed server-side — users provide their own
+      # OpenSubtitles API key via the Stremio add-on config UI.

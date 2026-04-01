@@ -8,43 +8,8 @@ export interface SubtitleResult {
   fileName: string;
 }
 
-// Module-level JWT state with mutex to avoid concurrent logins
-let jwtToken: string | null = null;
-let loginPromise: Promise<string> | null = null;
-
-async function loginUser(): Promise<string> {
-  const res = await axios.post(
-    `${BASE}/login`,
-    {
-      username: process.env.OPENSUBTITLES_USERNAME,
-      password: process.env.OPENSUBTITLES_PASSWORD,
-    },
-    { headers: commonHeaders() },
-  );
-  return res.data.token as string;
-}
-
-async function ensureJwt(): Promise<string> {
-  if (jwtToken) return jwtToken;
-  if (!loginPromise) {
-    loginPromise = loginUser().then(token => {
-      jwtToken = token;
-      loginPromise = null;
-      return token;
-    });
-  }
-  return loginPromise;
-}
-
-function commonHeaders(): Record<string, string> {
-  return {
-    'Api-Key': process.env.OPENSUBTITLES_API_KEY ?? '',
-    'Content-Type': 'application/json',
-    'User-Agent': 'DualSubsAddon/1.0',
-  };
-}
-
 export interface SearchOpts {
+  apiKey: string;
   hash?: string;
   imdbId: string;
   type: 'movie' | 'episode';
@@ -62,6 +27,14 @@ interface OsItem {
     language: string;
     download_count: number;
     files: OsFile[];
+  };
+}
+
+function headers(apiKey: string): Record<string, string> {
+  return {
+    'Api-Key': apiKey,
+    'Content-Type': 'application/json',
+    'User-Agent': 'DualSubsAddon/1.0',
   };
 }
 
@@ -83,7 +56,7 @@ export async function searchSubtitles(
   }
 
   const res = await axios.get(`${BASE}/subtitles`, {
-    headers: commonHeaders(),
+    headers: headers(opts.apiKey),
     params,
   });
 
@@ -108,38 +81,14 @@ export async function searchSubtitles(
   };
 }
 
-const hasCredentials =
-  !!process.env.OPENSUBTITLES_USERNAME && !!process.env.OPENSUBTITLES_PASSWORD;
+export async function downloadSrt(fileId: number, apiKey: string): Promise<string> {
+  const res = await axios.post(
+    `${BASE}/download`,
+    { file_id: fileId },
+    { headers: headers(apiKey) },
+  );
 
-export async function downloadSrt(fileId: number): Promise<string> {
-  const extraHeaders: Record<string, string> = {};
-
-  if (hasCredentials) {
-    const jwt = await ensureJwt();
-    extraHeaders['Authorization'] = `Bearer ${jwt}`;
-  }
-
-  const attempt = async (authHeaders: Record<string, string>): Promise<string> => {
-    const res = await axios.post(
-      `${BASE}/download`,
-      { file_id: fileId },
-      { headers: { ...commonHeaders(), ...authHeaders } },
-    );
-
-    const { link } = res.data as { link: string };
-    const srtRes = await axios.get<string>(link, { responseType: 'text' });
-    return srtRes.data;
-  };
-
-  try {
-    return await attempt(extraHeaders);
-  } catch (err: unknown) {
-    if (axios.isAxiosError(err) && err.response?.status === 401 && hasCredentials) {
-      // Token expired — re-login and retry once
-      jwtToken = null;
-      const fresh = await ensureJwt();
-      return attempt({ Authorization: `Bearer ${fresh}` });
-    }
-    throw err;
-  }
+  const { link } = res.data as { link: string };
+  const srtRes = await axios.get<string>(link, { responseType: 'text' });
+  return srtRes.data;
 }
