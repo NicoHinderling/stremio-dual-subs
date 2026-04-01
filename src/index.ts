@@ -8,7 +8,9 @@ import { getCached } from './cache';
 const PORT = parseInt(process.env.PORT ?? '7001', 10);
 // Render.com injects these automatically
 const HOST = process.env.RENDER_EXTERNAL_URL ?? `http://localhost:${PORT}`;
-const GIT_SHA = (process.env.RENDER_GIT_COMMIT ?? 'local').slice(0, 7);
+const GIT_COMMIT = process.env.RENDER_GIT_COMMIT ?? '';
+const GIT_SHA = GIT_COMMIT ? GIT_COMMIT.slice(0, 7) : 'local';
+const GIT_URL = GIT_COMMIT ? `https://github.com/NicoHinderling/stremio-dual-subs/commit/${GIT_COMMIT}` : null;
 
 const builder = new addonBuilder(manifest);
 registerSubtitleHandler(builder, HOST);
@@ -80,7 +82,7 @@ const configurePage = `<!DOCTYPE html>
       On Apple TV: install on desktop Stremio first — it syncs automatically.
     </p>
     <p style="margin-top:20px; font-size:11px; color:#555; text-align:right">
-      deployed: <code style="color:#666">${GIT_SHA}</code>
+      deployed: ${GIT_URL ? `<a href="${GIT_URL}" target="_blank" style="color:#666">${GIT_SHA}</a>` : `<code style="color:#666">local</code>`}
     </p>
   </div>
   <script>
