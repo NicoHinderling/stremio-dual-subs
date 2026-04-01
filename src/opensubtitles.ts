@@ -108,19 +108,22 @@ export async function searchSubtitles(
   };
 }
 
-export async function downloadSrt(fileId: number): Promise<string> {
-  const jwt = await ensureJwt();
+const hasCredentials =
+  !!process.env.OPENSUBTITLES_USERNAME && !!process.env.OPENSUBTITLES_PASSWORD;
 
-  const attempt = async (token: string): Promise<string> => {
+export async function downloadSrt(fileId: number): Promise<string> {
+  const extraHeaders: Record<string, string> = {};
+
+  if (hasCredentials) {
+    const jwt = await ensureJwt();
+    extraHeaders['Authorization'] = `Bearer ${jwt}`;
+  }
+
+  const attempt = async (authHeaders: Record<string, string>): Promise<string> => {
     const res = await axios.post(
       `${BASE}/download`,
       { file_id: fileId },
-      {
-        headers: {
-          ...commonHeaders(),
-          Authorization: `Bearer ${token}`,
-        },
-      },
+      { headers: { ...commonHeaders(), ...authHeaders } },
     );
 
     const { link } = res.data as { link: string };
@@ -129,13 +132,13 @@ export async function downloadSrt(fileId: number): Promise<string> {
   };
 
   try {
-    return await attempt(jwt);
+    return await attempt(extraHeaders);
   } catch (err: unknown) {
-    if (axios.isAxiosError(err) && err.response?.status === 401) {
+    if (axios.isAxiosError(err) && err.response?.status === 401 && hasCredentials) {
       // Token expired — re-login and retry once
       jwtToken = null;
       const fresh = await ensureJwt();
-      return attempt(fresh);
+      return attempt({ Authorization: `Bearer ${fresh}` });
     }
     throw err;
   }

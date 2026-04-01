@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { addonBuilder, getRouter } from 'stremio-addon-sdk';
 import { manifest } from './manifest';
