@@ -41,8 +41,12 @@ export function registerSubtitleHandler(
     const season = seasonStr ? parseInt(seasonStr, 10) : undefined;
     const episode = episodeStr ? parseInt(episodeStr, 10) : undefined;
     const osType = type === 'series' ? 'episode' : 'movie';
-    const hash = (extra as Record<string, string> | undefined)?.videoHash;
+    const extraMap = (extra as Record<string, string> | undefined) ?? {};
+    const hash = extraMap.videoHash;
+    const filename = extraMap.filename;
     const numericImdb = imdbId.replace(/^tt/, '');
+
+    console.log('[DualSubs]', JSON.stringify({ type, id, hash: hash ?? null, filename: filename ?? null, extraKeys: Object.keys(extraMap) }));
 
     const key = cacheKey(hash, imdbId, lang1, lang2);
 
@@ -51,12 +55,15 @@ export function registerSubtitleHandler(
       return buildResponse(baseUrl, key, lang1, lang2);
     }
 
-    const opts: SearchOpts = { apiKey, hash, imdbId: numericImdb, type: osType, season, episode };
+    const opts: SearchOpts = { apiKey, hash, imdbId: numericImdb, type: osType, season, episode, filename };
 
     const [res1, res2] = await Promise.allSettled([
       fetchSrt(lang1, opts),
       fetchSrt(lang2, opts),
     ]);
+
+    if (res1.status === 'rejected') console.warn('[DualSubs] lang1 failed:', res1.reason?.message);
+    if (res2.status === 'rejected') console.warn('[DualSubs] lang2 failed:', res2.reason?.message);
 
     const srt1 = res1.status === 'fulfilled' ? res1.value : null;
     const srt2 = res2.status === 'fulfilled' ? res2.value : null;
