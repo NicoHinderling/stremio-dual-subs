@@ -51,12 +51,26 @@ function pickBest(items: OsItem[]): SubtitleResult | null {
 async function osSearch(
   params: Record<string, string | number>,
   apiKey: string,
+  retries = 2,
 ): Promise<OsItem[]> {
-  const res = await axios.get(`${BASE}/subtitles`, {
-    headers: headers(apiKey),
-    params,
-  });
-  return res.data.data as OsItem[];
+  try {
+    const res = await axios.get(`${BASE}/subtitles`, {
+      headers: headers(apiKey),
+      params,
+    });
+    return res.data.data as OsItem[];
+  } catch (err) {
+    if (axios.isAxiosError(err) && retries > 0) {
+      const status = err.response?.status;
+      if (status === 503 || status === 429) {
+        const delay = status === 429 ? 2000 : 1000;
+        console.log(`[OS] got ${status}, retrying in ${delay}ms (${retries} left)`);
+        await new Promise(r => setTimeout(r, delay));
+        return osSearch(params, apiKey, retries - 1);
+      }
+    }
+    throw err;
+  }
 }
 
 // Parse a show title from a torrent filename.
@@ -77,10 +91,14 @@ export async function searchSubtitles(
 ): Promise<SubtitleResult | null> {
   // 1. Hash search — most accurate, works for any content type
   if (opts.hash) {
-    console.log(`[OS] hash search lang=${lang} hash=${opts.hash}`);
-    const items = await osSearch({ languages: lang, moviehash: opts.hash }, opts.apiKey);
-    if (items.length > 0) return pickBest(items);
-    console.log('[OS] hash search returned 0, falling back');
+    try {
+      console.log(`[OS] hash search lang=${lang} hash=${opts.hash}`);
+      const items = await osSearch({ languages: lang, moviehash: opts.hash }, opts.apiKey);
+      if (items.length > 0) return pickBest(items);
+      console.log('[OS] hash search returned 0, falling back');
+    } catch (err) {
+      console.warn(`[OS] hash search failed, falling back: ${(err as Error).message}`);
+    }
   }
 
   // 2. Movie: IMDb ID search (works reliably for movies)
